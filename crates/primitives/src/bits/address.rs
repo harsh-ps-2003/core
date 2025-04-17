@@ -1,4 +1,4 @@
-use crate::{aliases::U160, utils::keccak256, FixedBytes};
+use crate::{aliases::U160, utils::keccak256, FixedBytes, B256};
 use alloc::{
     borrow::Borrow,
     string::{String, ToString},
@@ -477,6 +477,23 @@ impl Address {
     #[doc(alias = "from_signing_key")]
     pub fn from_private_key(private_key: &k256::ecdsa::SigningKey) -> Self {
         Self::from_public_key(private_key.verifying_key())
+    }
+
+    /// Calculates the address of a contract created using `EOFCREATE`.
+    ///
+    /// Defined in [EIP-3540: EOF - EVM Object Format v1](https://eips.ethereum.org/EIPS/eip-3540).
+    ///
+    /// The address is calculated as `keccak256(0xff || sender_address || salt - B256 || keccak256(initcode))[12:]`.
+    /// Note: The buffer contains 12 zero bytes between the 0xff prefix and the sender address.
+    #[inline]
+    #[must_use]
+    pub fn create_eof(&self, salt: B256) -> Self {
+        let mut buffer = [0u8; 65];
+        buffer[0] = 0xff;
+        buffer[13..33].copy_from_slice(self.as_slice());
+        buffer[33..65].copy_from_slice(salt.as_slice());
+        let hash = keccak256(buffer);
+        Address::from_word(hash)
     }
 }
 
